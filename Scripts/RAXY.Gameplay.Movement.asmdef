@@ -1,0 +1,17 @@
+{
+    "name": "RAXY.Gameplay.Movement",
+    "rootNamespace": "RAXY.Movement",
+    "references": [
+        "GUID:29f5e2add06bdf84695e4800dc734257",
+        "GUID:f51ebe6a0ceec4240a699833d6309b23"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

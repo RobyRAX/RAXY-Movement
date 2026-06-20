@@ -1,0 +1,13 @@
+{
+  "name": "com.raxy.movement",
+  "version": "1.0.0",
+  "displayName": "RAXY Movement",
+  "author": {
+    "name": "RobyRAX",
+    "url": "https://github.com/RobyRAX"
+  },
+  "dependencies": {
+    "com.raxy.utility": "1.0.0",
+    "com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask"
+  }
+}
