@@ -9,9 +9,7 @@ namespace RAXY.Movement
     public class MovementController : MonoBehaviour
     {
         [TitleGroup("Base")]
-        [InfoBox("Set this via Game Dependency Prefab")]
-        [ShowInInspector]
-        [ReadOnly]
+        [SerializeField]
         protected float gravity = -75;
 
         [TitleGroup("Base")]
