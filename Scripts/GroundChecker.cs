@@ -307,18 +307,14 @@ namespace RAXY.Movement
             }
             else
             {
-                SurfaceNormal = Vector3.up;
-                SurfaceAngle = 0f;
-
-                OnSlope = false;
-                OnSteep = false;
-
 #if UNITY_EDITOR
                 _debugDrawValid = false;
 #endif
 
                 if (IsGrounded)
                 {
+                    // Keep last OnSteep/OnSlope/SurfaceAngle during unground grace so
+                    // Slide does not briefly see "grounded + not steep" and false-Land.
                     if (!_waitingForUnground)
                     {
                         _waitingForUnground = true;
@@ -329,9 +325,21 @@ namespace RAXY.Movement
 
                     if (_ungroundedTimer >= ungroundedDelay)
                     {
+                        SurfaceNormal = Vector3.up;
+                        SurfaceAngle = 0f;
+                        OnSlope = false;
+                        OnSteep = false;
+
                         IsGrounded = false;
                         _waitingForUnground = false;
                     }
+                }
+                else
+                {
+                    SurfaceNormal = Vector3.up;
+                    SurfaceAngle = 0f;
+                    OnSlope = false;
+                    OnSteep = false;
                 }
             }
 
@@ -426,8 +434,11 @@ namespace RAXY.Movement
                 SurfaceNormal = hit.normal;
                 SurfaceAngle = Vector3.Angle(Vector3.up, SurfaceNormal);
 
-                OnSlope = SurfaceAngle <= _cachedSlopeLimit && SurfaceAngle > MIN_SLOPE_ANGLE;
-                OnSteep = SurfaceAngle > _cachedSlopeLimit;
+                bool isForceSteep = hit.collider != null &&
+                    ((1 << hit.collider.gameObject.layer) & ForceSteepLayers) != 0;
+
+                OnSlope = !isForceSteep && SurfaceAngle <= _cachedSlopeLimit && SurfaceAngle > MIN_SLOPE_ANGLE;
+                OnSteep = isForceSteep || SurfaceAngle > _cachedSlopeLimit;
 
 #if UNITY_EDITOR
                 Debug.DrawLine(
@@ -438,6 +449,7 @@ namespace RAXY.Movement
                 );
 #endif
             }
+            // Ray miss: keep existing OnSteep/OnSlope from SphereCast — do not flip steep off.
 
             ConfirmedGroundType = DetermineTargetGroundType();
             return ConfirmedGroundType;
