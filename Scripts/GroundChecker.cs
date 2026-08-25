@@ -156,6 +156,11 @@ namespace RAXY.Movement
 
         CharacterController _charCon;
         const float MIN_SLOPE_ANGLE = 5f;
+        /// <summary>
+        /// Hits with normal.y below this are treated as walls, not ground
+        /// (~75.5° from up). Prevents SphereCast wall-graze from grounding / pitching.
+        /// </summary>
+        const float MIN_GROUND_NORMAL_Y = 0.25f;
 
         [TitleGroup("Debug")]
         [ShowInInspector]
@@ -262,6 +267,33 @@ namespace RAXY.Movement
 
             if (groundedNow)
             {
+                bool isForceSteep = ((1 << sphereHit.collider.gameObject.layer) & ForceSteepLayers) != 0;
+
+                // Wall-like SphereCast graze: ignore for grounding unless ForceSteep.
+                // Near corners the sphere often hits the wall before the floor.
+                if (!isForceSteep && sphereHit.normal.y < MIN_GROUND_NORMAL_Y)
+                {
+                    float rayDist = checkDistance + _cachedRadius;
+                    if (Physics.Raycast(
+                            sphereOrigin,
+                            Vector3.down,
+                            out rayHit,
+                            rayDist,
+                            CombinedGroundMask,
+                            QueryTriggerInteraction.Ignore) &&
+                        rayHit.normal.y >= MIN_GROUND_NORMAL_Y)
+                    {
+                        sphereHit = rayHit;
+                    }
+                    else
+                    {
+                        groundedNow = false;
+                    }
+                }
+            }
+
+            if (groundedNow)
+            {
                 _ungroundedTimer = 0f;
                 _waitingForUnground = false;
                 IsGrounded = true;
@@ -286,8 +318,8 @@ namespace RAXY.Movement
                         raycastValid = true;
                         float rayAngle = Vector3.Angle(Vector3.up, rayHit.normal);
 
-                        // Replace with steeper result
-                        if (rayAngle > SurfaceAngle)
+                        // Only adopt ray result if it is still walkable ground
+                        if (rayHit.normal.y >= MIN_GROUND_NORMAL_Y && rayAngle > SurfaceAngle)
                         {
                             SurfaceAngle = rayAngle;
                             SurfaceNormal = rayHit.normal;
@@ -431,6 +463,18 @@ namespace RAXY.Movement
 
             if (rayValid)
             {
+                // Wall-like confirmation hit is not ground
+                if (hit.normal.y < MIN_GROUND_NORMAL_Y)
+                {
+                    bool hitForceSteep = hit.collider != null &&
+                        ((1 << hit.collider.gameObject.layer) & ForceSteepLayers) != 0;
+                    if (!hitForceSteep)
+                    {
+                        ConfirmedGroundType = GroundType.None;
+                        return ConfirmedGroundType;
+                    }
+                }
+
                 SurfaceNormal = hit.normal;
                 SurfaceAngle = Vector3.Angle(Vector3.up, SurfaceNormal);
 

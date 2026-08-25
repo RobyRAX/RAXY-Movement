@@ -101,12 +101,20 @@ namespace RAXY.Movement
         public CharacterController CharCon { get; protected set; }
         public const float TERMINAL_VELOCITY = -53f; // adjust to taste
         protected const float GRAVITY_ON_FLAT = -2.5f;
+        /// <summary>
+        /// Surfaces steeper than this (from up) block CharacterController step-up.
+        /// Prevents climbing sharp mesh wall corners via stepOffset.
+        /// </summary>
+        protected const float STEP_BLOCK_ANGLE = 60f;
         protected virtual float AdditionalSpeedMultiplier => 1;
+
+        float _cachedStepOffset;
 
         protected virtual void Awake()
         {
             GroundChecker = GetComponent<GroundChecker>();
             CharCon = GetComponent<CharacterController>();
+            _cachedStepOffset = CharCon.stepOffset;
 
             EnableRotate();
         }
@@ -239,8 +247,65 @@ namespace RAXY.Movement
             Vector3 displacement = finalVelocity * Time.deltaTime;
             displacement += impulseDisplacement;
 
-            if (CharCon.enabled)
-                CharCon.Move(displacement);
+            if (!CharCon.enabled)
+                return;
+
+            // CC stepOffset climbs sharp MeshCollider wall corners; disable while
+            // moving into steep geometry (walls still collide, stairs still work).
+            bool blockStep = ShouldBlockStepOffset(displacement);
+            CharCon.stepOffset = blockStep ? 0f : _cachedStepOffset;
+
+            Vector3 posBefore = transform.position;
+            CharCon.Move(displacement);
+
+            // Safety: if we still got pushed up while hitting a side (corner seam),
+            // keep horizontal result but revert the unexpected climb.
+            if (blockStep &&
+                (CharCon.collisionFlags & CollisionFlags.Sides) != 0 &&
+                transform.position.y > posBefore.y + 0.001f &&
+                displacement.y <= 0.001f)
+            {
+                float climbed = transform.position.y - posBefore.y;
+                CharCon.Move(Vector3.down * climbed);
+            }
+
+            CharCon.stepOffset = _cachedStepOffset;
+        }
+
+        /// <summary>
+        /// True when horizontal motion is about to hit a steep/wall-like surface
+        /// that CharacterController would otherwise treat as a climbable step.
+        /// </summary>
+        protected virtual bool ShouldBlockStepOffset(Vector3 displacement)
+        {
+            Vector3 horizontal = new Vector3(displacement.x, 0f, displacement.z);
+            if (horizontal.sqrMagnitude < 1e-8f)
+                return false;
+
+            Vector3 dir = horizontal.normalized;
+            float radius = CharCon.radius;
+            float probeDist = radius + CharCon.skinWidth + 0.08f;
+
+            // Raycasts (not SphereCast): still hit when already flush against a wall.
+            // Sample near feet where stepOffset evaluates ledges.
+            float[] heights = { 0.05f, radius * 0.5f, radius };
+            for (int i = 0; i < heights.Length; i++)
+            {
+                Vector3 origin = transform.position + Vector3.up * heights[i];
+                if (!Physics.Raycast(
+                        origin,
+                        dir,
+                        out RaycastHit hit,
+                        probeDist,
+                        ~0,
+                        QueryTriggerInteraction.Ignore))
+                    continue;
+
+                if (Vector3.Angle(Vector3.up, hit.normal) >= STEP_BLOCK_ANGLE)
+                    return true;
+            }
+
+            return false;
         }
 
         #region Toggle
